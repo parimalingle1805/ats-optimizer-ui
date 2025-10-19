@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATS Optimizer</title>
+    <!-- This script pulls in the Tailwind CSS library -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+        /* Custom scrollbar for better aesthetics */
+        textarea::-webkit-scrollbar, #result-display::-webkit-scrollbar {
+            width: 8px;
+        }
+        textarea::-webkit-scrollbar-track, #result-display::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        textarea::-webkit-scrollbar-thumb, #result-display::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        textarea::-webkit-scrollbar-thumb:hover, #result-display::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        /* This ensures the output text wraps correctly */
+        #result-display {
+            white-space: pre-wrap; 
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="container mx-auto max-w-6xl w-full bg-white rounded-2xl shadow-2xl p-6 md:p-10">
+        
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-800">ATS Optimizer</h1>
+            <p class="text-gray-600 mt-2 text-lg">Tailor Your Resume to Any Job Description with AI Agents</p>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+            <!-- Input Section -->
+            <div class="space-y-6">
+                <div>
+                    <label for="jd-input" class="block text-lg font-semibold text-gray-700 mb-2">1. Paste Job Description</label>
+                    <textarea id="jd-input" rows="12" class="w-full p-4 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out" placeholder="Paste the full job description here..."></textarea>
+                </div>
+                <div>
+                    <label for="resume-input" class="block text-lg font-semibold text-gray-700 mb-2">2. Paste Master Resume</label>
+                    <textarea id="resume-input" rows="12" class="w-full p-4 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out" placeholder="Paste your master resume text here..."></textarea>
+                </div>
+            </div>
+
+            <!-- Output Section -->
+            <div class="bg-gray-50 p-6 rounded-lg shadow-inner flex flex-col">
+                 <h2 class="text-lg font-semibold text-gray-700 mb-2">3. Optimized Resume</h2>
+                <div id="result-container" class="flex-grow border border-gray-200 rounded-lg bg-white p-4 overflow-y-auto">
+                    <div id="placeholder" class="text-gray-400">
+                        Your tailored resume will appear here...
+                    </div>
+                    <div id="loader" class="hidden flex flex-col items-center justify-center h-full">
+                        <svg class="animate-spin h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p class="mt-4 text-gray-600">Agents are at work... this may take a moment.</p>
+                    </div>
+                    <div id="result-display" class="hidden"></div>
+                    <div id="error-message" class="hidden text-red-600 bg-red-100 p-4 rounded-lg"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Action Button -->
+        <footer class="text-center mt-8">
+            <button id="optimize-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-indigo-300">
+                Optimize My Resume
+            </button>
+        </footer>
+    </div>
+
+    <!-- START OF JAVASCRIPT LOGIC -->
+    <script>
+        // Find all the interactive elements on the page
+        const optimizeBtn = document.getElementById('optimize-btn');
+        const jdInput = document.getElementById('jd-input');
+        const resumeInput = document.getElementById('resume-input');
+        
+        const placeholder = document.getElementById('placeholder');
+        const loader = document.getElementById('loader');
+        const resultDisplay = document.getElementById('result-display');
+        const errorMessage = document.getElementById('error-message');
+
+        // Add a "click" event listener to the main button
+        optimizeBtn.addEventListener('click', async () => {
+            const jdText = jdInput.value;
+            const resumeText = resumeInput.value;
+
+            // --- 1. Manage UI State: Show Loader ---
+            placeholder.classList.add('hidden');
+            resultDisplay.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+            loader.classList.remove('hidden');
+
+            // Simple validation
+            if (!jdText.trim() || !resumeText.trim()) {
+                errorMessage.textContent = 'Please paste both the job description and your resume.';
+                errorMessage.classList.remove('hidden');
+                loader.classList.add('hidden');
+                return;
+            }
+            
+            // --- 2. Call the Backend API ---
+            // This URL points to your locally running Flask server.
+            const backendUrl = 'https://ats-optimizer-backend-206199118543.us-central1.run.app/api/optimize-resume';
+
+            try {
+                const response = await fetch(backendUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jd: jdText,
+                        resume: resumeText,
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    // If the server returned an error (like 500), throw an error to be caught below
+                    throw new Error(data.error || `HTTP error! status: ${response.status}`);
+                }
+                
+                // --- 3a. Handle Success ---
+                resultDisplay.textContent = data.content;
+                resultDisplay.classList.remove('hidden');
+
+            } catch (error) {
+                // --- 3b. Handle Failure ---
+                console.error('Error during optimization:', error);
+                errorMessage.textContent = `An error occurred: ${error.message}`;
+                errorMessage.classList.remove('hidden');
+            } finally {
+                // --- 4. Final UI State: Hide Loader ---
+                // This 'finally' block runs whether the call succeeded or failed.
+                loader.classList.add('hidden');
+            }
+        });
+    </script>
+    <!-- END OF JAVASCRIPT LOGIC -->
+</body>
+</html>
