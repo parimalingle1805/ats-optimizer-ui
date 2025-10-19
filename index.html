@@ -54,8 +54,22 @@
                     <textarea id="jd-input" rows="12" class="w-full p-4 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out" placeholder="Paste the full job description here..."></textarea>
                 </div>
                 <div>
-                    <label for="resume-input" class="block text-lg font-semibold text-gray-700 mb-2">2. Paste Master Resume</label>
-                    <textarea id="resume-input" rows="12" class="w-full p-4 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out" placeholder="Paste your master resume text here..."></textarea>
+                    <label for="resume-upload" class="block text-lg font-semibold text-gray-700 mb-2">2. Upload Master Resume</label>
+                    <div id="upload-container" class="mt-2 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-10">
+                        <div class="text-center">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M1.5 6a2.25 2.25 0 012.25-2.25h16.5A2.25 2.25 0 0122.5 6v12a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 18V6zM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z" clip-rule="evenodd" />
+                            </svg>
+                            <div class="mt-4 flex text-sm leading-6 text-gray-600">
+                                <label for="resume-upload-input" class="relative cursor-pointer rounded-md bg-white font-semibold text-indigo-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2 hover:text-indigo-500">
+                                    <span>Upload a file</span>
+                                    <input id="resume-upload-input" name="resumeFile" type="file" class="sr-only" accept=".docx,.pdf">
+                                </label>
+                                <p class="pl-1">or drag and drop</p>
+                            </div>
+                            <p id="file-name-display" class="text-xs leading-5 text-gray-600">DOCX or PDF up to 10MB</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -89,68 +103,97 @@
 
     <!-- START OF JAVASCRIPT LOGIC -->
     <script>
-        // Find all the interactive elements on the page
+        // Get references to all interactive elements
         const optimizeBtn = document.getElementById('optimize-btn');
         const jdInput = document.getElementById('jd-input');
-        const resumeInput = document.getElementById('resume-input');
+        const uploadInput = document.getElementById('resume-upload-input');
+        const fileNameDisplay = document.getElementById('file-name-display');
         
         const placeholder = document.getElementById('placeholder');
         const loader = document.getElementById('loader');
         const resultDisplay = document.getElementById('result-display');
         const errorMessage = document.getElementById('error-message');
 
-        // Add a "click" event listener to the main button
+        // Store the selected file in a global variable
+        let selectedFile = null;
+
+        // --- NEW: Event Listener for File Selection ---
+        uploadInput.addEventListener('change', (event) => {
+            const files = event.target.files;
+            if (files.length > 0) {
+                selectedFile = files[0];
+                fileNameDisplay.textContent = selectedFile.name; // Show the selected file's name
+                fileNameDisplay.classList.remove('text-gray-600');
+                fileNameDisplay.classList.add('text-indigo-600', 'font-semibold');
+            } else {
+                selectedFile = null;
+                fileNameDisplay.textContent = 'DOCX or PDF up to 10MB';
+                fileNameDisplay.classList.add('text-gray-600');
+                fileNameDisplay.classList.remove('text-indigo-600', 'font-semibold');
+            }
+        });
+
+        // --- MODIFIED: Event Listener for the Main Button ---
         optimizeBtn.addEventListener('click', async () => {
             const jdText = jdInput.value;
-            const resumeText = resumeInput.value;
 
-            // --- 1. Manage UI State: Show Loader ---
+            // UI State Management
             placeholder.classList.add('hidden');
             resultDisplay.classList.add('hidden');
-            errorMessage.classList.add('hidden');
+            errorMessage.classList.remove('hidden');
+            errorMessage.textContent = ''; // Clear previous errors
             loader.classList.remove('hidden');
-
-            // Simple validation
-            if (!jdText.trim() || !resumeText.trim()) {
-                errorMessage.textContent = 'Please paste both the job description and your resume.';
+            
+            // --- MODIFIED: Validation now checks for a file ---
+            if (!jdText.trim() || !selectedFile) {
+                errorMessage.textContent = 'Please paste the job description and upload a resume file.';
                 errorMessage.classList.remove('hidden');
                 loader.classList.add('hidden');
                 return;
             }
             
-            // --- 2. Call the Backend API ---
-            // This URL points to your locally running Flask server.
+            // --- NEW: Use FormData to send both text and file ---
+            const formData = new FormData();
+            formData.append('jd', jdText);
+            formData.append('resumeFile', selectedFile);
+
             const backendUrl = 'https://ats-optimizer-backend-206199118543.us-central1.run.app/api/optimize-resume';
 
             try {
                 const response = await fetch(backendUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        jd: jdText,
-                        resume: resumeText,
-                    }),
+                    // IMPORTANT: When sending FormData, DO NOT set the 'Content-Type' header.
+                    // The browser will automatically set it with the correct boundary.
+                    body: formData,
                 });
 
-                const data = await response.json();
-
                 if (!response.ok) {
-                    // If the server returned an error (like 500), throw an error to be caught below
-                    throw new Error(data.error || `HTTP error! status: ${response.status}`);
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
                 }
-                
-                // --- 3a. Handle Success ---
-                resultDisplay.textContent = data.content;
-                resultDisplay.classList.remove('hidden');
+
+                // --- NEW: Handle file download ---
+                const blob = await response.blob(); // Get the file data as a blob
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a'); // Create a temporary link element
+                a.style.display = 'none';
+                a.href = url;
+                // Suggest a filename for the download
+                a.download = `Tailored_Resume_${selectedFile.name}`;
+                document.body.appendChild(a);
+                a.click(); // Programmatically click the link to trigger the download
+                window.URL.revokeObjectURL(url); // Clean up the object URL
+                document.body.removeChild(a); // Clean up the link element
+
+                // Show a success message in the UI
+                placeholder.classList.remove('hidden');
+                placeholder.textContent = 'Success! Your tailored resume has been downloaded.';
 
             } catch (error) {
-                // --- 3b. Handle Failure ---
                 console.error('Error during optimization:', error);
                 errorMessage.textContent = `An error occurred: ${error.message}`;
                 errorMessage.classList.remove('hidden');
             } finally {
-                // --- 4. Final UI State: Hide Loader ---
-                // This 'finally' block runs whether the call succeeded or failed.
                 loader.classList.add('hidden');
             }
         });
