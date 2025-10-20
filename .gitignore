@@ -3,3 +3,4 @@ Dockerfile
 requirements.txt
 test_api.py
 __pycache__
+.gcloudignore
